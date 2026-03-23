@@ -3,7 +3,9 @@
 """
 dms_plots.py
 ────────────
-Updated version with improved aspect ratio handling for long sequences.
+Comprehensive DMS visualization script.
+Fixed: Included highlights and legends in Dark Energy site-average plots.
+Fixed: Better aspect ratio for long sequences.
 """
 
 from __future__ import annotations
@@ -106,7 +108,7 @@ def _wt_dots(ax, pivot, wt_map):
 
 
 def _highlight_heatmap_cols(ax, pivot, highlight):
-    """Draws a coloured rectangle around highlighted columns."""
+    """Draws a coloured rectangle around highlighted columns in heatmaps."""
     if not highlight:
         return
     hl    = set(highlight)
@@ -125,7 +127,7 @@ def _highlight_heatmap_cols(ax, pivot, highlight):
 
 
 def _highlight_bars(ax, positions, values, highlight, label="Catalytic"):
-    """Adds hatch pattern and a top label to highlighted bars."""
+    """Adds hatch pattern and a top label to highlighted bars in barplots."""
     if not highlight:
         return None
     hl = set(highlight)
@@ -144,16 +146,14 @@ def _highlight_bars(ax, positions, values, highlight, label="Catalytic"):
                      hatch="///", linewidth=1.5, label=label)
     return None
 
-def _get_heatmap_dims(n_pos):
-    """Calculates balanced figure dimensions and gridspec ratios."""
-    # Scale width more conservatively to avoid extreme aspect ratios
-    # For ~270 pos, this gives ~25-30 inches instead of 100+
-    fig_w = max(15, n_pos * 0.12 + 2.0)
-    fig_h = 7.5 # Slightly taller for better readability
 
-    # Adjust width ratio for colorbar based on total width
+def _get_heatmap_dims(n_pos):
+    """Calculates balanced figure dimensions to avoid 'ribbon' effect."""
+    fig_w = max(15, n_pos * 0.12 + 2.0)
+    fig_h = 7.5
     cbar_w = 0.4 if fig_w < 25 else 0.6
     return fig_w, fig_h, [fig_w - cbar_w, cbar_w]
+
 
 # ============================================================================
 # 1. Rosetta DMS
@@ -196,6 +196,8 @@ def plot_rosetta_dms(df, output_prefix=None, energy_col="ddG_total_energy",
     ax.bar(range(len(positions)), site_mean.values, color=colors, width=0.8)
     ax.axhline(0, color="black", linewidth=0.8)
     _xticks(ax, positions, wt_map, highlight=highlight_positions)
+    _highlight_bars(ax, positions, site_mean.values, highlight_positions)
+    ax.set_title("Rosetta DMS — Mean ΔΔG per position", fontweight="bold")
     _save(fig, f"{output_prefix}_rosetta_barplot.png" if output_prefix else None)
 
 
@@ -269,7 +271,7 @@ def plot_dark_energy(df, output_prefix=None, threshold=None,
     positions = list(pivot.index)
     wt_map    = df.drop_duplicates("Position_1based").set_index("Position_1based")["WT"].to_dict()
 
-    # Landscape Scatter
+    # 1. Landscape Scatter
     fig, ax = plt.subplots(figsize=(7, 6))
     sc = ax.scatter(df["ddG_total_energy"], df["delta_psi_evo_scaled"],
                     c=df["dark_energy"], cmap=CMAP_DIV, norm=norm, s=15, alpha=0.6)
@@ -278,7 +280,7 @@ def plot_dark_energy(df, output_prefix=None, threshold=None,
     fig.colorbar(sc, ax=ax).set_label("ΔEᵈᵃʳᵏ (kcal/mol)")
     _save(fig, f"{output_prefix}_de_landscape.png" if output_prefix else None)
 
-    # Heatmap
+    # 2. Heatmap
     fw, fh, wr = _get_heatmap_dims(len(positions))
     fig, axes = plt.subplots(1, 2, figsize=(fw, fh), gridspec_kw={"width_ratios": wr, "wspace": 0.03})
     ax, cax = axes
@@ -289,18 +291,42 @@ def plot_dark_energy(df, output_prefix=None, threshold=None,
     _wt_dots(ax, pivot, wt_map)
     _highlight_heatmap_cols(ax, pivot, highlight_positions)
     fig.colorbar(im, cax=cax).set_label("ΔEᵈᵃʳᵏ (kcal/mol)")
+    ax.set_title("Dark Energy — ΔEᵈᵃʳᵏ per variant", fontsize=13, fontweight="bold")
     _save(fig, f"{output_prefix}_de_heatmap.png" if output_prefix else None)
 
-    # Site-average
-    site_avg = df.groupby("Position_1based")["dark_energy"].mean().reindex(positions)
+    # 3. Site-average (Corrected with Highlights and Legend)
+    site_avg_df = df.groupby("Position_1based")["dark_energy"].mean().reindex(positions).reset_index()
+    sa_vals = site_avg_df["dark_energy"].values
+
     fig, ax = plt.subplots(figsize=(fw, 4.5))
-    colors = ["#e63946" if v >= threshold else "#457b9d" for v in site_avg]
-    ax.bar(range(len(positions)), site_avg.values, color=colors)
-    ax.axhline(threshold, color="#f4a261", ls="--", label="Threshold")
+    colors = ["#e63946" if v >= threshold else "#457b9d" for v in sa_vals]
+    ax.bar(range(len(positions)), sa_vals, color=colors, width=0.85)
+    ax.axhline(threshold, color="#f4a261", ls="--", lw=1.5, label=f"Threshold ({threshold:.2f})")
+    ax.axhline(0, color="black", lw=0.8)
+
     _xticks(ax, positions, wt_map, highlight=highlight_positions)
+    hl_patch = _highlight_bars(ax, positions, sa_vals, highlight_positions, label=f"Highlighted {HL_STAR}")
+
+    legend_handles = [
+        Patch(facecolor="#e63946", label="Functional (≥ Threshold)"),
+        Patch(facecolor="#457b9d", label="Folding-related (< Threshold)"),
+    ]
+    if hl_patch:
+        legend_handles.append(hl_patch)
+    ax.legend(handles=legend_handles, loc="upper right", fontsize=9)
+    ax.set_title("Dark Energy — Site-average ΔEᵈᵃʳᵏ", fontsize=12, fontweight="bold")
     _save(fig, f"{output_prefix}_de_site_avg.png" if output_prefix else None)
 
-# Convenience wrapper and CLI remain the same...
+    # 4. Distribution
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.hist(de_vals, bins=50, color="#457b9d", alpha=0.6, density=True)
+    ax.axvline(threshold, color="#e63946", ls="--", label="Threshold")
+    ax.set_xlabel("ΔEᵈᵃʳᵏ (kcal/mol)")
+    ax.set_title("Distribution of ΔEᵈᵃʳᵏ", fontweight="bold")
+    ax.legend()
+    _save(fig, f"{output_prefix}_de_distribution.png" if output_prefix else None)
+
+
 def plot_all(rosetta_csv=None, esm_csv=None, dark_csv=None,
              output_prefix=None, threshold=None, highlight_positions=None):
     if rosetta_csv:
