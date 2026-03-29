@@ -200,11 +200,11 @@ def plot_rosetta_dms(df, output_prefix=None, energy_col="ddG_total_energy",
     # ── heatmap  ──────────────────────────────────────────────────────
     n_aa  = len(pivot.columns)
     n_pos = len(positions)
-    fig_h = max(6, n_aa * 0.45 + 2.5)
-    fig_w = max(12, n_pos * 0.38 + 2.0)
+    fig_h = max(6, n_aa * 0.40 + 1.5)         # height scales with AA rows
+    fig_w = min(24, max(10, n_pos * 0.18 + 3)) # width capped at 24 in
     fig, axes = plt.subplots(
         1, 2, figsize=(fig_w, fig_h),
-        gridspec_kw={"width_ratios": [fig_w - 1.2, 0.4], "wspace": 0.04},
+        gridspec_kw={"width_ratios": [fig_w - 0.8, 0.4], "wspace": 0.03},
     )
     ax, cax = axes
     im = ax.imshow(pivot.T.values, aspect="auto",
@@ -227,7 +227,8 @@ def plot_rosetta_dms(df, output_prefix=None, energy_col="ddG_total_energy",
     _save(fig, f"{output_prefix}_rosetta_heatmap.png" if output_prefix else None)
     # ── barplot ───────────────────────────────────────────────────────────────
     site_mean = df.groupby("Position_Pose")[energy_col].mean().reindex(positions)
-    fig, ax   = plt.subplots(figsize=(max(8, len(positions) * 0.38), 4))
+    fig, ax  = plt.subplots(
+        figsize=(min(24, max(10, len(positions) * 0.18 + 3)), 4))
     colors    = ["#e63946" if v > 0 else "#457b9d" for v in site_mean]
     ax.bar(range(len(positions)), site_mean.values, color=colors,
            edgecolor="none", width=0.8)
@@ -277,13 +278,13 @@ def plot_evo_scores(df, output_prefix=None, vmin=None, vmax=None,
     n_aa  = len(pivot.columns)   # 20
     n_pos = len(positions)
     # Height: fixed per-AA row height (0.45 in) + margins; width: per-position
-    fig_h = max(6, n_aa * 0.45 + 2.5)
-    fig_w = max(12, n_pos * 0.38 + 2.0)   # +2 for Y-axis labels & colorbar
+    fig_h = max(6, n_aa * 0.40 + 1.5)         # height scales with AA rows
+    fig_w = min(24, max(10, n_pos * 0.18 + 3)) # width capped at 24 in
 
     fig, axes = plt.subplots(
         1, 2,
         figsize=(fig_w, fig_h),
-        gridspec_kw={"width_ratios": [fig_w - 1.2, 0.4], "wspace": 0.04},
+        gridspec_kw={"width_ratios": [fig_w - 0.8, 0.4], "wspace": 0.03},
     )
     ax, cax = axes
 
@@ -404,11 +405,11 @@ def plot_dark_energy(df, output_prefix=None, threshold=None,
     # ── heatmap  ──────────────────────────────────────────────────────
     n_aa  = len(pivot.columns)
     n_pos = len(positions)
-    fig_h = max(6, n_aa * 0.45 + 2.5)
-    fig_w = max(12, n_pos * 0.38 + 2.0)
+    fig_h = max(6, n_aa * 0.40 + 1.5)         # height scales with AA rows
+    fig_w = min(24, max(10, n_pos * 0.18 + 3)) # width capped at 24 in
     fig, axes = plt.subplots(
         1, 2, figsize=(fig_w, fig_h),
-        gridspec_kw={"width_ratios": [fig_w - 1.2, 0.4], "wspace": 0.04},
+        gridspec_kw={"width_ratios": [fig_w - 0.8, 0.4], "wspace": 0.03},
     )
     ax, cax = axes
     im = ax.imshow(pivot.T.values, aspect="auto",
@@ -436,7 +437,8 @@ def plot_dark_energy(df, output_prefix=None, threshold=None,
     sa_wt    = dict(zip(site_avg["Position_1based"], site_avg["WT"]))
     sa_vals  = site_avg["dark_energy"].values
 
-    fig, ax  = plt.subplots(figsize=(max(8, len(sa_pos) * 0.38), 4))
+    fig, ax  = plt.subplots(
+        figsize=(min(24, max(10, len(sa_pos) * 0.18 + 3)), 4))
     colors   = ["#e63946" if v >= threshold else "#457b9d" for v in sa_vals]
     ax.bar(range(len(sa_pos)), sa_vals, color=colors, edgecolor="none", width=0.85)
     ax.axhline(threshold, color="#f4a261", lw=1.5, ls="--",
